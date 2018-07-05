@@ -64,50 +64,12 @@ fn main() {
     ];
 
     // Texture settings and loading
-    let mut texture = 0;
-    unsafe {
-        // gen texture binding
-        gl::GenTextures(1, &mut texture);
-        gl::BindTexture(gl::TEXTURE_2D, texture);
-
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as gl::types::GLint);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as gl::types::GLint);
-
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as gl::types::GLint);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as gl::types::GLint);
-
-        // Load the texture into memory
-        let (mut width, mut height, mut nr_channels) = (0, 0, 0);
-        let data = stb_image::stbi_load(
-            std::ffi::CString::new("Resources/container.jpg").unwrap().as_bytes_with_nul().as_ptr() as *const i8,
-            &mut width, &mut height, &mut nr_channels, 0
-        );
-        
-        println!("data ptr: {:?}", data);
-        //println!("{:?}", std::slice::from_raw_parts(data, (width*height) as usize));
-        if width == 0 && height == 0 {
-            panic!("container.jpg wasn't loaded properly!");
-        }
-
-        // Push texture to gpu
-        gl::TexImage2D(
-            gl::TEXTURE_2D,
-            0,
-            gl::RGB as gl::types::GLint,
-            width, height,
-            0,
-            gl::RGB,
-            gl::UNSIGNED_BYTE,
-            data as *const gl::types::GLvoid
-        );
-        //gl::GenerateMipmap(gl::TEXTURE_2D);
-
-        // Free texture from memory
-        stb_image::stbi_image_free(data as *mut std::os::raw::c_void);
-    }
+    let texture1 = create_texture("container.jpg");
+    let texture2 = create_texture("awesomeface.png");
 
     shader_program.set_used();
-    shader_program.set_int("ourTexture", 0);
+    shader_program.set_int("texture1", 0);
+    shader_program.set_int("texture2", 1);
     println!("Starting main!");
     'main: loop {
         for event in event_pump.poll_iter() {
@@ -144,7 +106,9 @@ fn main() {
         shader_program.set_used();
         unsafe {
             gl::ActiveTexture(gl::TEXTURE0);
-            gl::BindTexture(gl::TEXTURE_2D, texture);
+            gl::BindTexture(gl::TEXTURE_2D, texture1);
+            gl::ActiveTexture(gl::TEXTURE1);
+            gl::BindTexture(gl::TEXTURE_2D, texture2);
             gl::BindVertexArray(vao1);
             gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
             //gl::DrawArrays(gl::TRIANGLES, 0, 3);
@@ -235,4 +199,48 @@ fn create_triangle_vao(vbo: gl::types::GLuint, ebo: gl::types::GLuint) -> gl::ty
         gl::EnableVertexAttribArray(2);
     }
     return vao;
+}
+
+fn create_texture(name: &str) -> gl::types::GLuint {
+    let mut texture = 0;
+    unsafe {
+        stb_image::stbi_set_flip_vertically_on_load(true as i32); 
+        // gen texture binding
+        gl::GenTextures(1, &mut texture);
+        gl::BindTexture(gl::TEXTURE_2D, texture);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as gl::types::GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as gl::types::GLint);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as gl::types::GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as gl::types::GLint);
+
+        // Load the texture into memory
+        let (mut width, mut height, mut nr_channels) = (0, 0, 0);
+        let data = stb_image::stbi_load(
+            std::ffi::CString::new(format!("Resources/{}", name)).unwrap().as_bytes_with_nul().as_ptr() as *const i8,
+            &mut width, &mut height, &mut nr_channels, 0
+        );
+        
+        if width == 0 && height == 0 {
+            panic!("{} wasn't loaded properly!", name);
+        }
+
+        // Push texture to gpu
+        gl::TexImage2D(
+            gl::TEXTURE_2D,
+            0,
+            gl::RGB as gl::types::GLint,
+            width, height,
+            0,
+            if name.ends_with("jpg") {gl::RGB} else {gl::RGBA},
+            gl::UNSIGNED_BYTE,
+            data as *const gl::types::GLvoid
+        );
+        //gl::GenerateMipmap(gl::TEXTURE_2D);
+
+        // Free texture from memory
+        stb_image::stbi_image_free(data as *mut std::os::raw::c_void);
+    }
+    return texture;
 }
