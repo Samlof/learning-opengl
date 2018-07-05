@@ -1,0 +1,12 @@
+[package]
+name = "learning-opengl"
+version = "0.1.0"
+authors = ["Samuli Löf <samuli.lof@gmail.com>"]
+
+[dependencies]
+gl = "0.10.0"
+stb_image = { path = "deps/stb_image" }
+
+[dependencies.sdl2]
+version = "0.31.0"
+features = ["bundled", "static-link"]
