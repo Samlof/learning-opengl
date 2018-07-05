@@ -38,11 +38,13 @@ fn main() {
     ).unwrap();
 
     let vertices = [
-        // positions         // colors
-        0.5f32, -0.5, 0.0,  1.0, 0.0, 0.0,   // bottom right
-        -0.5, -0.5, 0.0,  0.0, 1.0, 0.0,   // bottom left
-        0.0,  0.5, 0.0,  0.0, 0.0, 1.0    // top 
+        // positions          // colors           // texture coords
+        0.5f32,  0.5, 0.0,   1.0, 0.0, 0.0,   1.0, 1.0,   // top right
+        0.5, -0.5, 0.0,   0.0, 1.0, 0.0,   1.0, 0.0,   // bottom right
+        -0.5, -0.5, 0.0,   0.0, 0.0, 1.0,   0.0, 0.0,   // bottom left
+        -0.5,  0.5, 0.0,   1.0, 1.0, 0.0,   0.0, 1.0    // top left 
     ];
+
     let indices: [gl::types::GLuint; 6] = [0, 1, 3, 1, 2, 3];
 
     let mut nr_attribs: gl::types::GLint = 0;
@@ -52,7 +54,8 @@ fn main() {
     println!("Max vertex attribs {}", nr_attribs);
 
     let vbo1: gl::types::GLuint = create_triangle_vbo(vertices);
-    let vao1: gl::types::GLuint = create_triangle_vao(vbo1);
+    let ebo1 = create_square_ebo(indices);
+    let vao1: gl::types::GLuint = create_triangle_vao(vbo1, ebo1);
 
     let tex_coords = [
     0.0f32, 0.0,  // lower-left corner  
@@ -60,22 +63,51 @@ fn main() {
     0.5, 1.0   // top-center corner
     ];
 
+    // Texture settings and loading
+    let mut texture = 0;
     unsafe {
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::MIRRORED_REPEAT as gl::types::GLint);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::MIRRORED_REPEAT as gl::types::GLint);
+        // gen texture binding
+        gl::GenTextures(1, &mut texture);
+        gl::BindTexture(gl::TEXTURE_2D, texture);
 
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR_MIPMAP_LINEAR as gl::types::GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as gl::types::GLint);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as gl::types::GLint);
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as gl::types::GLint);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as gl::types::GLint);
 
+        // Load the texture into memory
         let (mut width, mut height, mut nr_channels) = (0, 0, 0);
         let data = stb_image::stbi_load(
             std::ffi::CString::new("Resources/container.jpg").unwrap().as_bytes_with_nul().as_ptr() as *const i8,
             &mut width, &mut height, &mut nr_channels, 0
         );
-        println!("{} {} {}", width, height, nr_channels);
+        
+        println!("data ptr: {:?}", data);
+        //println!("{:?}", std::slice::from_raw_parts(data, (width*height) as usize));
+        if width == 0 && height == 0 {
+            panic!("container.jpg wasn't loaded properly!");
+        }
+
+        // Push texture to gpu
+        gl::TexImage2D(
+            gl::TEXTURE_2D,
+            0,
+            gl::RGB as gl::types::GLint,
+            width, height,
+            0,
+            gl::RGB,
+            gl::UNSIGNED_BYTE,
+            data as *const gl::types::GLvoid
+        );
+        //gl::GenerateMipmap(gl::TEXTURE_2D);
+
+        // Free texture from memory
+        stb_image::stbi_image_free(data as *mut std::os::raw::c_void);
     }
 
-
+    shader_program.set_used();
+    shader_program.set_int("ourTexture", 0);
     println!("Starting main!");
     'main: loop {
         for event in event_pump.poll_iter() {
@@ -111,16 +143,18 @@ fn main() {
         //shader_program.set_uniform_4f("myColor", green_value);
         shader_program.set_used();
         unsafe {
+            gl::ActiveTexture(gl::TEXTURE0);
+            gl::BindTexture(gl::TEXTURE_2D, texture);
             gl::BindVertexArray(vao1);
-            //gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
-            gl::DrawArrays(gl::TRIANGLES, 0, 3);
+            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
+            //gl::DrawArrays(gl::TRIANGLES, 0, 3);
         }
 
         window.gl_swap_window();
     }
 }
 
-fn create_triangle_vbo(vertices: [f32; 18]) -> gl::types::GLuint {
+fn create_triangle_vbo(vertices: [f32; 32]) -> gl::types::GLuint {
     use std::mem::size_of;
 
     let mut vbo: gl::types::GLuint = 0;
@@ -138,7 +172,27 @@ fn create_triangle_vbo(vertices: [f32; 18]) -> gl::types::GLuint {
     return vbo;
 }
 
-fn create_triangle_vao(vbo: gl::types::GLuint) -> gl::types::GLuint {
+fn create_square_ebo(indices: [gl::types::GLuint; 6]) -> gl::types::GLuint {
+    use std::mem::size_of;
+
+    let mut ebo: gl::types::GLuint = 0;
+    unsafe {
+        gl::GenBuffers(1, &mut ebo);
+        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
+
+        // Copy index array to gl
+        gl::BufferData(
+            gl::ELEMENT_ARRAY_BUFFER,
+            (indices.len() * size_of::<gl::types::GLuint>()) as gl::types::GLsizeiptr,
+            indices.as_ptr() as *const gl::types::GLvoid,
+            gl::STATIC_DRAW
+        );
+    }
+
+    return ebo;
+}
+
+fn create_triangle_vao(vbo: gl::types::GLuint, ebo: gl::types::GLuint) -> gl::types::GLuint {
     let mut vao: gl::types::GLuint = 0;
     unsafe {
         gl::GenVertexArrays(1, &mut vao);
@@ -146,16 +200,8 @@ fn create_triangle_vao(vbo: gl::types::GLuint) -> gl::types::GLuint {
 
         // Copy vertice array to gl
         gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-        /*
-        // Copy index array to gl
+        
         gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
-        gl::BufferData(
-            gl::ELEMENT_ARRAY_BUFFER,
-            (indices.len() * size_of::<gl::types::GLuint>()) as gl::types::GLsizeiptr,
-            indices.as_ptr() as *const gl::types::GLvoid,
-            gl::STATIC_DRAW
-        );
-        */
 
         // Set Position vertex attrib pointers
         gl::VertexAttribPointer(
@@ -163,7 +209,7 @@ fn create_triangle_vao(vbo: gl::types::GLuint) -> gl::types::GLuint {
             3,
             gl::FLOAT,
             gl::FALSE,
-            (6 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
+            (8 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
             std::ptr::null(),
         );
         gl::EnableVertexAttribArray(0);
@@ -173,10 +219,20 @@ fn create_triangle_vao(vbo: gl::types::GLuint) -> gl::types::GLuint {
             3,
             gl::FLOAT,
             gl::FALSE,
-            (6 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
+            (8 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
             (3 * std::mem::size_of::<f32>()) as *const gl::types::GLvoid,
         );
         gl::EnableVertexAttribArray(1);
+        // Tex
+        gl::VertexAttribPointer(
+            2,
+            2,
+            gl::FLOAT,
+            gl::FALSE,
+            (8 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
+            (6 * std::mem::size_of::<f32>()) as *const gl::types::GLvoid,
+        );
+        gl::EnableVertexAttribArray(2);
     }
     return vao;
 }
