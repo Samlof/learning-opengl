@@ -12,6 +12,9 @@ use cgmath::prelude::*;
 use cgmath::{Deg, Matrix4};
 
 fn main() {
+    let mut screen_width = 900;
+    let mut screen_height = 700;
+
     let start_time = std::time::SystemTime::now();
 
     let sdl = sdl2::init().unwrap();
@@ -22,7 +25,7 @@ fn main() {
     gl_attr.set_context_version(3, 3);
 
     let window = video_subsystem
-        .window("Game", 900, 700)
+        .window("Game", screen_width, screen_height)
         .opengl()
         .resizable()
         .build()
@@ -35,7 +38,7 @@ fn main() {
     let mut event_pump = sdl.event_pump().unwrap();
 
     unsafe {
-        gl::Viewport(0, 0, 900, 700);
+        gl::Viewport(0, 0, screen_width as gl::types::GLint, screen_height as gl::types::GLint);
         gl::ClearColor(0.2, 0.3, 0.3, 1.0);
     }
     let shader_program = render_gl::Program::from_shaders(
@@ -69,20 +72,30 @@ fn main() {
     0.5, 1.0   // top-center corner
     ];
 
-    // Texture settings and loading
+    // Texture loading
     let texture1 = create_texture("container.jpg");
     let texture2 = create_texture("awesomeface.png");
-
+    // Set textures
     shader_program.set_used();
     shader_program.set_int("texture1", 0);
     shader_program.set_int("texture2", 1);
+    unsafe {
+        gl::ActiveTexture(gl::TEXTURE0);
+        gl::BindTexture(gl::TEXTURE_2D, texture1);
+        gl::ActiveTexture(gl::TEXTURE1);
+        gl::BindTexture(gl::TEXTURE_2D, texture2);
+    }
 
-    // Test transformation matrix
-    let mat : cgmath::Matrix4<f32>= Matrix4::from_scale(1.0);
-    let rotation_mat = mat * Matrix4::from_angle_z(Deg(90.0));
-    let scale_mat = rotation_mat * Matrix4::from_scale(0.5);
-    shader_program.set_mat4("transform", scale_mat.as_ptr());
-    
+    // Model matrix
+    let model = Matrix4::from_angle_x(Deg(-55.0));
+    let view = Matrix4::from_translation(cgmath::Vector3{x: 0.0, y: 0.0, z: -3.0});
+    let mut projection : Matrix4<f32> = cgmath::PerspectiveFov{
+        fovy: Deg(35.0).into(),
+        aspect: screen_width as f32 / screen_height as f32,
+        near: 0.1,
+        far: 100.0
+    }.into();
+
     println!("Starting main!");
     'main: loop {
         for event in event_pump.poll_iter() {
@@ -95,6 +108,15 @@ fn main() {
                     win_event,
                 } => match win_event {
                     sdl2::event::WindowEvent::Resized(width, height) => unsafe {
+                        // Update projection and gl viewport
+                        screen_width = width as u32;
+                        screen_height = height as u32;
+                        projection = cgmath::PerspectiveFov{
+                            fovy: Deg(35.0).into(),
+                            aspect: screen_width as f32 / screen_height as f32,
+                            near: 0.1,
+                            far: 100.0
+                        }.into();
                         gl::Viewport(0, 0, width, height);
                     },
                     _ => {}
@@ -113,18 +135,19 @@ fn main() {
         let secs = secs1 as f32;
         let ms = time.subsec_millis() as f32 / 1000.0;
         let time = secs + ms;
+
         // Send a rotation transformation
         let mut mat = Matrix4::from_translation(cgmath::Vector3{x: 0.5, y: -0.5, z: 0.0});
         mat = mat * Matrix4::from_angle_z(Deg(time));
-        shader_program.set_mat4("transform", mat.as_ptr());
+
+        shader_program.set_mat4("model", model.as_ptr());
+        shader_program.set_mat4("view", view.as_ptr());
+        shader_program.set_mat4("projection", projection.as_ptr());
         
         //shader_program.set_uniform_4f("myColor", green_value);
         shader_program.set_used();
         unsafe {
-            gl::ActiveTexture(gl::TEXTURE0);
-            gl::BindTexture(gl::TEXTURE_2D, texture1);
-            gl::ActiveTexture(gl::TEXTURE1);
-            gl::BindTexture(gl::TEXTURE_2D, texture2);
+
             gl::BindVertexArray(vao1);
             gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
             //gl::DrawArrays(gl::TRIANGLES, 0, 3);
