@@ -97,6 +97,16 @@ impl Program {
             gl::Uniform1f(uniform_loc, value as gl::types::GLfloat);
         }
     }
+    pub fn set_mat4(&self, name: &str, value: *const gl::types::GLfloat) {
+        unsafe {
+            let uniform_loc = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_bytes_with_nul().as_ptr() as *const gl::types::GLchar);
+            if uniform_loc == -1 {
+                println!("Couldn't find uniform location: \"{}\"!", name);
+            }
+            self.set_used();
+            gl::UniformMatrix4fv(uniform_loc, 1, gl::FALSE, value);
+        }
+    }
 }
 
 impl Drop for Program {

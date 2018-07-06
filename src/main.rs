@@ -4,10 +4,16 @@
 extern crate gl;
 extern crate sdl2;
 extern crate stb_image;
+extern crate cgmath;
 
 pub mod render_gl;
 
+use cgmath::prelude::*;
+use cgmath::{Deg, Matrix4};
+
 fn main() {
+    let start_time = std::time::SystemTime::now();
+
     let sdl = sdl2::init().unwrap();
     let video_subsystem = sdl.video().unwrap();
 
@@ -70,6 +76,13 @@ fn main() {
     shader_program.set_used();
     shader_program.set_int("texture1", 0);
     shader_program.set_int("texture2", 1);
+
+    // Test transformation matrix
+    let mat : cgmath::Matrix4<f32>= Matrix4::from_scale(1.0);
+    let rotation_mat = mat * Matrix4::from_angle_z(Deg(90.0));
+    let scale_mat = rotation_mat * Matrix4::from_scale(0.5);
+    println!("{:?}", scale_mat);
+    shader_program.set_mat4("transform", scale_mat.as_ptr());
     println!("Starting main!");
     'main: loop {
         for event in event_pump.poll_iter() {
@@ -94,14 +107,17 @@ fn main() {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
 
-        // Calculate time to use for green value
-        let time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap();
-        let secs1 = time.as_secs() % 1000;
+        // Calculate time
+        let time = std::time::SystemTime::now().duration_since(start_time).unwrap();
+        let secs1 = time.as_secs();
         let secs = secs1 as f32;
         let ms = time.subsec_millis() as f32 / 1000.0;
         let time = secs + ms;
-        let green_value = (time.sin() / 2.0) + 0.5;
-
+        // Send a rotation transformation
+        let mut mat = Matrix4::from_translation(cgmath::Vector3{x: 0.5, y: -0.5, z: 0.0});
+        mat = mat * Matrix4::from_angle_z(Deg(time));
+        shader_program.set_mat4("transform", mat.as_ptr());
+        
         //shader_program.set_uniform_4f("myColor", green_value);
         shader_program.set_used();
         unsafe {

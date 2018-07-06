@@ -5,6 +5,7 @@ authors = ["Samuli Löf <samuli.lof@gmail.com>"]
 
 [dependencies]
 gl = "0.10.0"
+cgmath = "0.16.1"
 stb_image = { path = "deps/stb_image" }
 
 [dependencies.sdl2]
