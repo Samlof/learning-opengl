@@ -123,6 +123,20 @@ fn main() {
         gl::BindTexture(gl::TEXTURE_2D, texture2);
     }
 
+    // Cube positions
+    let cube_positions = [
+        cgmath::Vector3{x: 0.0f32,y:  0.0f32,z:  0.0f32}, 
+        cgmath::Vector3{x: 2.0f32,y:  5.0f32,z: -15.0f32}, 
+        cgmath::Vector3{x:-1.5f32,y: -2.2f32,z: -2.5f32},  
+        cgmath::Vector3{x:-3.8f32,y: -2.0f32,z: -12.3f32},  
+        cgmath::Vector3{x: 2.4f32,y: -0.4f32,z: -3.5f32},  
+        cgmath::Vector3{x:-1.7f32,y:  3.0f32,z: -7.5f32},  
+        cgmath::Vector3{x: 1.3f32,y: -2.0f32,z: -2.5f32},  
+        cgmath::Vector3{x: 1.5f32,y:  2.0f32,z: -2.5f32}, 
+        cgmath::Vector3{x: 1.5f32,y:  0.2f32,z: -1.5f32}, 
+        cgmath::Vector3{x:-1.3f32,y:  1.0f32,z: -1.5f32}  
+    ];
+
     println!("Starting main!");
     'main: loop {
         for event in event_pump.poll_iter() {
@@ -167,12 +181,7 @@ fn main() {
             far: 100.0
         }.into();
 
-        model = model * Matrix4::from_axis_angle(
-            cgmath::Vector3{x: 0.5, y: 1.0, z: 0.0}.normalize(),
-            Deg(time * 20.0)
-            );
 
-        shader_program.set_mat4("model", model.as_ptr());
         shader_program.set_mat4("view", view.as_ptr());
         shader_program.set_mat4("projection", projection.as_ptr());
         
@@ -181,7 +190,17 @@ fn main() {
         unsafe {
 
             gl::BindVertexArray(vao1);
-            gl::DrawArrays(gl::TRIANGLES, 0, 36);
+
+            for i in 0..10 {
+                let mut model = Matrix4::from_translation(cube_positions[i]);
+                model = model * Matrix4::from_axis_angle(
+                    cgmath::Vector3{x: 1.0, y: 0.3, z: 0.5}.normalize(),
+                    Deg(10.0 * i as f32 * time)
+                );
+                shader_program.set_mat4("model", model.as_ptr());
+
+                gl::DrawArrays(gl::TRIANGLES, 0, 36);
+            }
             //gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
             //gl::DrawArrays(gl::TRIANGLES, 0, 3);
         }
