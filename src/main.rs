@@ -81,8 +81,8 @@ fn main() {
     let mat : cgmath::Matrix4<f32>= Matrix4::from_scale(1.0);
     let rotation_mat = mat * Matrix4::from_angle_z(Deg(90.0));
     let scale_mat = rotation_mat * Matrix4::from_scale(0.5);
-    println!("{:?}", scale_mat);
     shader_program.set_mat4("transform", scale_mat.as_ptr());
+    
     println!("Starting main!");
     'main: loop {
         for event in event_pump.poll_iter() {
