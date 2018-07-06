@@ -40,18 +40,55 @@ fn main() {
     unsafe {
         gl::Viewport(0, 0, screen_width as gl::types::GLint, screen_height as gl::types::GLint);
         gl::ClearColor(0.2, 0.3, 0.3, 1.0);
+        gl::Enable(gl::DEPTH_TEST);
     }
     let shader_program = render_gl::Program::from_shaders(
         include_str!("triangle.vert"),
         include_str!("triangle.frag")
     ).unwrap();
 
-    let vertices = [
-        // positions          // colors           // texture coords
-        0.5f32,  0.5, 0.0,   1.0, 0.0, 0.0,   1.0, 1.0,   // top right
-        0.5, -0.5, 0.0,   0.0, 1.0, 0.0,   1.0, 0.0,   // bottom right
-        -0.5, -0.5, 0.0,   0.0, 0.0, 1.0,   0.0, 0.0,   // bottom left
-        -0.5,  0.5, 0.0,   1.0, 1.0, 0.0,   0.0, 1.0    // top left 
+    let vertices = vec![
+    -0.5f32, -0.5, -0.5,  0.0, 0.0,
+     0.5, -0.5, -0.5,  1.0, 0.0,
+     0.5,  0.5, -0.5,  1.0, 1.0,
+     0.5,  0.5, -0.5,  1.0, 1.0,
+    -0.5,  0.5, -0.5,  0.0, 1.0,
+    -0.5, -0.5, -0.5,  0.0, 0.0,
+
+    -0.5, -0.5,  0.5,  0.0, 0.0,
+     0.5, -0.5,  0.5,  1.0, 0.0,
+     0.5,  0.5,  0.5,  1.0, 1.0,
+     0.5,  0.5,  0.5,  1.0, 1.0,
+    -0.5,  0.5,  0.5,  0.0, 1.0,
+    -0.5, -0.5,  0.5,  0.0, 0.0,
+
+    -0.5,  0.5,  0.5,  1.0, 0.0,
+    -0.5,  0.5, -0.5,  1.0, 1.0,
+    -0.5, -0.5, -0.5,  0.0, 1.0,
+    -0.5, -0.5, -0.5,  0.0, 1.0,
+    -0.5, -0.5,  0.5,  0.0, 0.0,
+    -0.5,  0.5,  0.5,  1.0, 0.0,
+
+     0.5,  0.5,  0.5,  1.0, 0.0,
+     0.5,  0.5, -0.5,  1.0, 1.0,
+     0.5, -0.5, -0.5,  0.0, 1.0,
+     0.5, -0.5, -0.5,  0.0, 1.0,
+     0.5, -0.5,  0.5,  0.0, 0.0,
+     0.5,  0.5,  0.5,  1.0, 0.0,
+
+    -0.5, -0.5, -0.5,  0.0, 1.0,
+     0.5, -0.5, -0.5,  1.0, 1.0,
+     0.5, -0.5,  0.5,  1.0, 0.0,
+     0.5, -0.5,  0.5,  1.0, 0.0,
+    -0.5, -0.5,  0.5,  0.0, 0.0,
+    -0.5, -0.5, -0.5,  0.0, 1.0,
+
+    -0.5,  0.5, -0.5,  0.0, 1.0,
+     0.5,  0.5, -0.5,  1.0, 1.0,
+     0.5,  0.5,  0.5,  1.0, 0.0,
+     0.5,  0.5,  0.5,  1.0, 0.0,
+    -0.5,  0.5,  0.5,  0.0, 0.0,
+    -0.5,  0.5, -0.5,  0.0, 1.0
     ];
 
     let indices: [gl::types::GLuint; 6] = [0, 1, 3, 1, 2, 3];
@@ -86,16 +123,6 @@ fn main() {
         gl::BindTexture(gl::TEXTURE_2D, texture2);
     }
 
-    // Model matrix
-    let model = Matrix4::from_angle_x(Deg(-55.0));
-    let view = Matrix4::from_translation(cgmath::Vector3{x: 0.0, y: 0.0, z: -3.0});
-    let mut projection : Matrix4<f32> = cgmath::PerspectiveFov{
-        fovy: Deg(35.0).into(),
-        aspect: screen_width as f32 / screen_height as f32,
-        near: 0.1,
-        far: 100.0
-    }.into();
-
     println!("Starting main!");
     'main: loop {
         for event in event_pump.poll_iter() {
@@ -111,12 +138,6 @@ fn main() {
                         // Update projection and gl viewport
                         screen_width = width as u32;
                         screen_height = height as u32;
-                        projection = cgmath::PerspectiveFov{
-                            fovy: Deg(35.0).into(),
-                            aspect: screen_width as f32 / screen_height as f32,
-                            near: 0.1,
-                            far: 100.0
-                        }.into();
                         gl::Viewport(0, 0, width, height);
                     },
                     _ => {}
@@ -126,7 +147,7 @@ fn main() {
         }
 
         unsafe {
-            gl::Clear(gl::COLOR_BUFFER_BIT);
+            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
 
         // Calculate time
@@ -136,9 +157,20 @@ fn main() {
         let ms = time.subsec_millis() as f32 / 1000.0;
         let time = secs + ms;
 
-        // Send a rotation transformation
-        let mut mat = Matrix4::from_translation(cgmath::Vector3{x: 0.5, y: -0.5, z: 0.0});
-        mat = mat * Matrix4::from_angle_z(Deg(time));
+        // Model matrix
+        let mut model = Matrix4::from_angle_x(Deg(-55.0));
+        let view = Matrix4::from_translation(cgmath::Vector3{x: 0.0, y: 0.0, z: -3.0});
+        let mut projection : Matrix4<f32> = cgmath::PerspectiveFov{
+            fovy: Deg(35.0).into(),
+            aspect: screen_width as f32 / screen_height as f32,
+            near: 0.1,
+            far: 100.0
+        }.into();
+
+        model = model * Matrix4::from_axis_angle(
+            cgmath::Vector3{x: 0.5, y: 1.0, z: 0.0}.normalize(),
+            Deg(time * 20.0)
+            );
 
         shader_program.set_mat4("model", model.as_ptr());
         shader_program.set_mat4("view", view.as_ptr());
@@ -149,7 +181,8 @@ fn main() {
         unsafe {
 
             gl::BindVertexArray(vao1);
-            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
+            gl::DrawArrays(gl::TRIANGLES, 0, 36);
+            //gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
             //gl::DrawArrays(gl::TRIANGLES, 0, 3);
         }
 
@@ -157,7 +190,7 @@ fn main() {
     }
 }
 
-fn create_triangle_vbo(vertices: [f32; 32]) -> gl::types::GLuint {
+fn create_triangle_vbo(vertices: Vec<f32>) -> gl::types::GLuint {
     use std::mem::size_of;
 
     let mut vbo: gl::types::GLuint = 0;
@@ -212,30 +245,20 @@ fn create_triangle_vao(vbo: gl::types::GLuint, ebo: gl::types::GLuint) -> gl::ty
             3,
             gl::FLOAT,
             gl::FALSE,
-            (8 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
+            (5 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
             std::ptr::null(),
         );
         gl::EnableVertexAttribArray(0);
-        // Color
+        // Tex
         gl::VertexAttribPointer(
             1,
-            3,
+            2,
             gl::FLOAT,
             gl::FALSE,
-            (8 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
+            (5 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
             (3 * std::mem::size_of::<f32>()) as *const gl::types::GLvoid,
         );
         gl::EnableVertexAttribArray(1);
-        // Tex
-        gl::VertexAttribPointer(
-            2,
-            2,
-            gl::FLOAT,
-            gl::FALSE,
-            (8 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
-            (6 * std::mem::size_of::<f32>()) as *const gl::types::GLvoid,
-        );
-        gl::EnableVertexAttribArray(2);
     }
     return vao;
 }
