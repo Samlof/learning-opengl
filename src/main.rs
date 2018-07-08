@@ -137,7 +137,7 @@ fn main() {
         cgmath::Vector3{x: 1.5f32,y:  0.2f32,z: -1.5f32}, 
         cgmath::Vector3{x:-1.3f32,y:  1.0f32,z: -1.5f32}  
     ];
-
+    
     println!("Starting main!");
     'main: loop {
         for event in event_pump.poll_iter() {

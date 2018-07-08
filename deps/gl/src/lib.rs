@@ -7,4 +7,4 @@
 
 // For autocompletion I use the file here
 pub use bindings::*;
-pub mod bindings;
+mod bindings;
