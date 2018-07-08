@@ -19,6 +19,7 @@ fn main() {
 
     let sdl = sdl2::init().unwrap();
     let video_subsystem = sdl.video().unwrap();
+    sdl.mouse().set_relative_mouse_mode(true);
 
     let gl_attr = video_subsystem.gl_attr();
     gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
@@ -137,7 +138,24 @@ fn main() {
         cgmath::Vector3{x: 1.5f32,y:  0.2f32,z: -1.5f32}, 
         cgmath::Vector3{x:-1.3f32,y:  1.0f32,z: -1.5f32}  
     ];
-    
+
+    // Camera variables
+    let mut camera_pos = cgmath::Vector3{x: 0.0f32, y: 0.0, z: 3.0};
+    let mut camera_front = cgmath::Vector3{x: 0.0f32, y: 0.0, z: -1.0};
+    let camera_up = cgmath::Vector3{x: 0.0f32, y: 1.0, z: 0.0};
+
+    // Time variables
+    let mut delta_time = 0f32;
+    let mut last_frame = 0f32;
+
+    // For some reason have to put in a lot of yaw at beginning
+    let mut yaw = 270.0f32;
+    let mut pitch = 0f32;
+
+    let mut fov = 45.0f32;
+
+    let mut first_mouse = true;
+
     println!("Starting main!");
     'main: loop {
         for event in event_pump.poll_iter() {
@@ -157,8 +175,59 @@ fn main() {
                     },
                     _ => {}
                 }, // Window events end
+                sdl2::event::Event::KeyDown{keycode: Some(keycode), ..} => {
+                    if keycode == sdl2::keyboard::Keycode::Escape {
+                        break 'main;
+                    }
+                },
+                sdl2::event::Event::MouseMotion{xrel, yrel, ..} => {
+                    if first_mouse { first_mouse = false; break; }
+                    let yrel = -yrel;
+
+                    let sensitivity = 0.05f32;
+                    let x_offset = xrel as f32 * sensitivity;
+                    let y_offset = yrel as f32 * sensitivity;
+
+                    yaw += x_offset;
+                    pitch += y_offset;
+
+                    pitch = pitch.min(89.0);
+                    pitch = pitch.max(-89.0);
+
+                    let front = cgmath::Vector3{
+                        x: Deg(pitch).cos() * Deg(yaw).cos(),
+                        y: Deg(pitch).sin(),
+                        z: Deg(pitch).cos() * Deg(yaw).sin()
+                    };
+                    camera_front = front.normalize();
+                },
+                sdl2::event::Event::MouseWheel{y, ..} => {
+                    if y > 0 {
+                        // Scroll up
+                    } else if y < 0 {
+                        // Scroll down
+                    }
+                    if fov >= 1.0 && fov <= 45.0 {
+                        fov -= y as f32;
+                    }
+                    fov = fov.max(1.0);
+                    fov = fov.min(45.0);
+                },
                 _ => {}
             }
+        }
+
+        let camera_speed = 2.5 * delta_time;
+        // Check whether a key is down
+        if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::W) {
+            camera_pos += camera_speed * camera_front;
+        } else if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::S) {
+            camera_pos -= camera_speed * camera_front;
+        }
+        if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::A) {
+            camera_pos -= camera_front.cross(camera_up).normalize() * camera_speed;
+        } else if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::D) {
+            camera_pos += camera_front.cross(camera_up).normalize() * camera_speed;
         }
 
         unsafe {
@@ -166,22 +235,29 @@ fn main() {
         }
 
         // Calculate time
-        let time = std::time::SystemTime::now().duration_since(start_time).unwrap();
-        let secs1 = time.as_secs();
-        let secs = secs1 as f32;
-        let ms = time.subsec_millis() as f32 / 1000.0;
-        let time = secs + ms;
+        let current_frame = std::time::SystemTime::now().duration_since(start_time).unwrap();
+        let current_frame = duration_into_float(current_frame);
+        let time = current_frame;
+        delta_time = current_frame - last_frame;
+        last_frame = current_frame;
 
         // Model matrix
-        let mut model = Matrix4::from_angle_x(Deg(-55.0));
+        let model = Matrix4::from_angle_x(Deg(-55.0));
         let view = Matrix4::from_translation(cgmath::Vector3{x: 0.0, y: 0.0, z: -3.0});
-        let mut projection : Matrix4<f32> = cgmath::PerspectiveFov{
-            fovy: Deg(35.0).into(),
+        let projection : Matrix4<f32> = cgmath::PerspectiveFov{
+            fovy: Deg(fov).into(),
             aspect: screen_width as f32 / screen_height as f32,
             near: 0.1,
             far: 100.0
         }.into();
 
+         // Camera
+        let view = Matrix4::look_at(
+            cgmath::Point3::from_vec(camera_pos),
+            cgmath::Point3::from_vec(camera_pos + camera_front),
+            camera_up
+        );
+        
 
         shader_program.set_mat4("view", view.as_ptr());
         shader_program.set_mat4("projection", projection.as_ptr());
@@ -196,7 +272,7 @@ fn main() {
                 let mut model = Matrix4::from_translation(cube_positions[i]);
                 model = model * Matrix4::from_axis_angle(
                     cgmath::Vector3{x: 1.0, y: 0.3, z: 0.5}.normalize(),
-                    Deg(10.0 * i as f32 * time)
+                    Deg(10.0 * (i+1) as f32 * time)
                 );
                 shader_program.set_mat4("model", model.as_ptr());
 
@@ -210,6 +286,13 @@ fn main() {
     }
 }
 
+fn duration_into_float(duration: std::time::Duration) -> f32 {
+        let secs1 = duration.as_secs();
+        let secs = secs1 as f32;
+        let ms = duration.subsec_millis() as f32 / 1000.0;
+        let time = secs + ms;
+        return time;
+}
 fn create_triangle_vbo(vertices: Vec<f32>) -> gl::types::GLuint {
     use std::mem::size_of;
 
