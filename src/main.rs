@@ -109,6 +109,7 @@ fn main() {
     0.5, 1.0   // top-center corner
     ];
 
+
     // Texture loading
     let texture1 = create_texture("container.jpg");
     let texture2 = create_texture("awesomeface.png");
@@ -122,7 +123,7 @@ fn main() {
         gl::ActiveTexture(gl::TEXTURE1);
         gl::BindTexture(gl::TEXTURE_2D, texture2);
     }
-
+    
     // Cube positions
     let cube_positions = [
         cgmath::Vector3{x: 0.0f32,y:  0.0f32,z:  0.0f32}, 
@@ -303,6 +304,8 @@ fn create_texture(name: &str) -> gl::types::GLuint {
             &mut width, &mut height, &mut nr_channels, 0
         );
         
+        
+
         if width == 0 && height == 0 {
             panic!("{} wasn't loaded properly!", name);
         }
