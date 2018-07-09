@@ -6,10 +6,11 @@ extern crate sdl2;
 extern crate stb_image;
 extern crate cgmath;
 
-pub mod render_gl;
+mod render_gl;
+mod camera;
 
 use cgmath::prelude::*;
-use cgmath::{Deg, Matrix4};
+use cgmath::{Deg, Matrix4, Vector3};
 
 fn main() {
     let mut screen_width = 900;
@@ -127,32 +128,31 @@ fn main() {
     
     // Cube positions
     let cube_positions = [
-        cgmath::Vector3{x: 0.0f32,y:  0.0f32,z:  0.0f32}, 
-        cgmath::Vector3{x: 2.0f32,y:  5.0f32,z: -15.0f32}, 
-        cgmath::Vector3{x:-1.5f32,y: -2.2f32,z: -2.5f32},  
-        cgmath::Vector3{x:-3.8f32,y: -2.0f32,z: -12.3f32},  
-        cgmath::Vector3{x: 2.4f32,y: -0.4f32,z: -3.5f32},  
-        cgmath::Vector3{x:-1.7f32,y:  3.0f32,z: -7.5f32},  
-        cgmath::Vector3{x: 1.3f32,y: -2.0f32,z: -2.5f32},  
-        cgmath::Vector3{x: 1.5f32,y:  2.0f32,z: -2.5f32}, 
-        cgmath::Vector3{x: 1.5f32,y:  0.2f32,z: -1.5f32}, 
-        cgmath::Vector3{x:-1.3f32,y:  1.0f32,z: -1.5f32}  
+        Vector3{x: 0.0f32,y:  0.0f32,z:  0.0f32}, 
+        Vector3{x: 2.0f32,y:  5.0f32,z: -15.0f32}, 
+        Vector3{x:-1.5f32,y: -2.2f32,z: -2.5f32},  
+        Vector3{x:-3.8f32,y: -2.0f32,z: -12.3f32},  
+        Vector3{x: 2.4f32,y: -0.4f32,z: -3.5f32},  
+        Vector3{x:-1.7f32,y:  3.0f32,z: -7.5f32},  
+        Vector3{x: 1.3f32,y: -2.0f32,z: -2.5f32},  
+        Vector3{x: 1.5f32,y:  2.0f32,z: -2.5f32}, 
+        Vector3{x: 1.5f32,y:  0.2f32,z: -1.5f32}, 
+        Vector3{x:-1.3f32,y:  1.0f32,z: -1.5f32}  
     ];
 
     // Camera variables
-    let mut camera_pos = cgmath::Vector3{x: 0.0f32, y: 0.0, z: 3.0};
-    let mut camera_front = cgmath::Vector3{x: 0.0f32, y: 0.0, z: -1.0};
-    let camera_up = cgmath::Vector3{x: 0.0f32, y: 1.0, z: 0.0};
+    let camera_pos = Vector3{x: 0.0f32, y: 0.0, z: 3.0};
+    let world_up = Vector3{x: 0.0f32, y: 1.0, z: 0.0};
+
+    let yaw = 270.0f32; // For some reason have to put in a lot of yaw at beginning
+    let pitch = 0f32;
+
+    let mut camera = camera::Camera::new(
+        camera_pos, world_up, yaw, pitch);
 
     // Time variables
     let mut delta_time = 0f32;
     let mut last_frame = 0f32;
-
-    // For some reason have to put in a lot of yaw at beginning
-    let mut yaw = 270.0f32;
-    let mut pitch = 0f32;
-
-    let mut fov = 45.0f32;
 
     let mut first_mouse = true;
 
@@ -183,51 +183,26 @@ fn main() {
                 sdl2::event::Event::MouseMotion{xrel, yrel, ..} => {
                     if first_mouse { first_mouse = false; break; }
                     let yrel = -yrel;
-
-                    let sensitivity = 0.05f32;
-                    let x_offset = xrel as f32 * sensitivity;
-                    let y_offset = yrel as f32 * sensitivity;
-
-                    yaw += x_offset;
-                    pitch += y_offset;
-
-                    pitch = pitch.min(89.0);
-                    pitch = pitch.max(-89.0);
-
-                    let front = cgmath::Vector3{
-                        x: Deg(pitch).cos() * Deg(yaw).cos(),
-                        y: Deg(pitch).sin(),
-                        z: Deg(pitch).cos() * Deg(yaw).sin()
-                    };
-                    camera_front = front.normalize();
+                    camera.process_mouse_movement(xrel as f32, yrel as f32);
                 },
                 sdl2::event::Event::MouseWheel{y, ..} => {
-                    if y > 0 {
-                        // Scroll up
-                    } else if y < 0 {
-                        // Scroll down
-                    }
-                    if fov >= 1.0 && fov <= 45.0 {
-                        fov -= y as f32;
-                    }
-                    fov = fov.max(1.0);
-                    fov = fov.min(45.0);
+                    camera.process_mouse_scroll(y as f32);
                 },
                 _ => {}
             }
         }
 
-        let camera_speed = 2.5 * delta_time;
+        use camera::CameraMovement;
         // Check whether a key is down
         if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::W) {
-            camera_pos += camera_speed * camera_front;
+            camera.process_keyboard(CameraMovement::FORWARD, delta_time)
         } else if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::S) {
-            camera_pos -= camera_speed * camera_front;
+            camera.process_keyboard(CameraMovement::BACKWARD, delta_time)
         }
         if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::A) {
-            camera_pos -= camera_front.cross(camera_up).normalize() * camera_speed;
+            camera.process_keyboard(CameraMovement::LEFT, delta_time)
         } else if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::D) {
-            camera_pos += camera_front.cross(camera_up).normalize() * camera_speed;
+            camera.process_keyboard(CameraMovement::RIGHT, delta_time)
         }
 
         unsafe {
@@ -241,28 +216,17 @@ fn main() {
         delta_time = current_frame - last_frame;
         last_frame = current_frame;
 
-        // Model matrix
-        let model = Matrix4::from_angle_x(Deg(-55.0));
-        let view = Matrix4::from_translation(cgmath::Vector3{x: 0.0, y: 0.0, z: -3.0});
+        // Projection matrix
         let projection : Matrix4<f32> = cgmath::PerspectiveFov{
-            fovy: Deg(fov).into(),
+            fovy: Deg(camera.get_zoom()).into(),
             aspect: screen_width as f32 / screen_height as f32,
             near: 0.1,
             far: 100.0
-        }.into();
+        }.into();        
 
-         // Camera
-        let view = Matrix4::look_at(
-            cgmath::Point3::from_vec(camera_pos),
-            cgmath::Point3::from_vec(camera_pos + camera_front),
-            camera_up
-        );
-        
-
-        shader_program.set_mat4("view", view.as_ptr());
+        shader_program.set_mat4("view", camera.get_view_matrix().as_ptr());
         shader_program.set_mat4("projection", projection.as_ptr());
         
-        //shader_program.set_uniform_4f("myColor", green_value);
         shader_program.set_used();
         unsafe {
 
