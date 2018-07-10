@@ -7,7 +7,7 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn from_shaders(vertex_source: &str, frag_source: &str) -> Result<Program, String> {
+    pub fn from_shaders(vertex_source: &str, frag_source: &str) -> Result<Self, String> {
         let v_shader = Shader::from_vert_source(vertex_source).unwrap();
         let f_shader = Shader::from_frag_source(frag_source).unwrap();
         let shaders = [v_shader, f_shader];
