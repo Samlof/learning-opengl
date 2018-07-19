@@ -14,11 +14,19 @@ impl Model{
             vao: create_triangle_vao(vbo, ebo)
         }
     }
-
-    pub fn static_new() -> Self {
-
+    pub fn cube() -> Self {
         let indices: Vec<gl::types::GLuint> = vec![0, 1, 3, 1, 2, 3];
         Self::new(get_cube_vertices(), indices)
+    }
+
+    
+    pub fn light() -> Self {
+        let indices: Vec<gl::types::GLuint> = vec![0, 1, 3, 1, 2, 3];
+        let vbo = create_triangle_vbo(get_cube_vertices());
+        let ebo = create_square_ebo(indices);
+        Model {
+            vao: create_triangle_vao(vbo, ebo)
+        }
     }
 
     pub fn get_vao(&self) -> gl::types::GLuint { self.vao }
@@ -94,6 +102,31 @@ fn create_triangle_vao(vbo: gl::types::GLuint, ebo: gl::types::GLuint) -> gl::ty
             (3 * std::mem::size_of::<f32>()) as *const gl::types::GLvoid,
         );
         gl::EnableVertexAttribArray(1);
+    }
+    return vao;
+}
+
+fn create_light_vao(vbo: gl::types::GLuint, ebo: gl::types::GLuint) -> gl::types::GLuint {
+    let mut vao: gl::types::GLuint = 0;
+    unsafe {
+        gl::GenVertexArrays(1, &mut vao);
+        gl::BindVertexArray(vao);
+
+        // Copy vertice array to gl
+        gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+        
+        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
+
+        // Set Position vertex attrib pointers
+        gl::VertexAttribPointer(
+            0,
+            3,
+            gl::FLOAT,
+            gl::FALSE,
+            (5 * std::mem::size_of::<f32>()) as gl::types::GLint, // stride (byte offset between consecutive attributes)
+            std::ptr::null(),
+        );
+        gl::EnableVertexAttribArray(0);
     }
     return vao;
 }

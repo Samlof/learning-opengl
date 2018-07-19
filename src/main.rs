@@ -45,12 +45,18 @@ fn main() {
         gl::ClearColor(0.2, 0.3, 0.3, 1.0);
         gl::Enable(gl::DEPTH_TEST);
     }
-    let shader_program = render_gl::Program::from_shaders(
+    let lightning_shader = render_gl::Program::from_shaders(
         include_str!("triangle.vert"),
-        include_str!("triangle.frag")
+        include_str!("light.frag")
+    ).unwrap();
+    let lamp_shader = render_gl::Program::from_shaders(
+        include_str!("triangle.vert"),
+        include_str!("lamp.frag")
     ).unwrap();
 
-
+    lightning_shader.set_used();
+    lightning_shader.set_vec3("objectColor", 1.0, 0.5, 0.31);
+    lightning_shader.set_vec3("lightColor", 1.0, 1.0, 1.0);
 
     let mut nr_attribs: gl::types::GLint = 0;
     unsafe {
@@ -58,42 +64,11 @@ fn main() {
     }
     println!("Max vertex attribs {}", nr_attribs);
 
-    let model = model::Model::static_new();
+    let cube = model::Model::cube();
+    let light_vao = model::Model::light();
 
-    let tex_coords = [
-        0.0f32, 0.0,  // lower-left corner  
-        1.0, 0.0,  // lower-right corner
-        0.5, 1.0   // top-center corner
-    ];
-
-
-    // Texture loading
-    let texture1 = create_texture("container.jpg");
-    let texture2 = create_texture("awesomeface.png");
-    // Set textures
-    shader_program.set_used();
-    shader_program.set_int("texture1", 0);
-    shader_program.set_int("texture2", 1);
-    unsafe {
-        gl::ActiveTexture(gl::TEXTURE0);
-        gl::BindTexture(gl::TEXTURE_2D, texture1);
-        gl::ActiveTexture(gl::TEXTURE1);
-        gl::BindTexture(gl::TEXTURE_2D, texture2);
-    }
-    
-    // Cube positions
-    let cube_positions = [
-        Vector3{x: 0.0f32,y:  0.0f32,z:  0.0f32}, 
-        Vector3{x: 2.0f32,y:  5.0f32,z: -15.0f32}, 
-        Vector3{x:-1.5f32,y: -2.2f32,z: -2.5f32},  
-        Vector3{x:-3.8f32,y: -2.0f32,z: -12.3f32},  
-        Vector3{x: 2.4f32,y: -0.4f32,z: -3.5f32},  
-        Vector3{x:-1.7f32,y:  3.0f32,z: -7.5f32},  
-        Vector3{x: 1.3f32,y: -2.0f32,z: -2.5f32},  
-        Vector3{x: 1.5f32,y:  2.0f32,z: -2.5f32}, 
-        Vector3{x: 1.5f32,y:  0.2f32,z: -1.5f32}, 
-        Vector3{x:-1.3f32,y:  1.0f32,z: -1.5f32}  
-    ];
+    // Light location
+    let light_pos = Vector3{x: 1.2f32, y: 1.0, z: 2.0};
 
     // Camera variables
     let camera_pos = Vector3{x: 0.0f32, y: 0.0, z: 3.0};
@@ -146,20 +121,20 @@ fn main() {
                 _ => {}
             }
         }
-
-        use camera::CameraMovement;
-        // Check whether a key is down
-        if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::W) {
-            camera.process_keyboard(CameraMovement::FORWARD, delta_time)
-        } else if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::S) {
-            camera.process_keyboard(CameraMovement::BACKWARD, delta_time)
+        {
+            use camera::CameraMovement;
+            // Check whether a key is down
+            if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::W) {
+                camera.process_keyboard(CameraMovement::FORWARD, delta_time)
+            } else if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::S) {
+                camera.process_keyboard(CameraMovement::BACKWARD, delta_time)
+            }
+            if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::A) {
+                camera.process_keyboard(CameraMovement::LEFT, delta_time)
+            } else if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::D) {
+                camera.process_keyboard(CameraMovement::RIGHT, delta_time)
+            }
         }
-        if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::A) {
-            camera.process_keyboard(CameraMovement::LEFT, delta_time)
-        } else if event_pump.keyboard_state().is_scancode_pressed(sdl2::keyboard::Scancode::D) {
-            camera.process_keyboard(CameraMovement::RIGHT, delta_time)
-        }
-
         unsafe {
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
@@ -178,27 +153,29 @@ fn main() {
             near: 0.1,
             far: 100.0
         }.into();        
+        let model = Matrix4::from_translation((0.0, 0.0, 0.0).into());
+        // Draw cube
+        lightning_shader.set_used();
+        lightning_shader.set_mat4("view", camera.get_view_matrix().as_ptr());
+        lightning_shader.set_mat4("projection", projection.as_ptr());
+        lightning_shader.set_mat4("model", model.as_ptr());
 
-        shader_program.set_mat4("view", camera.get_view_matrix().as_ptr());
-        shader_program.set_mat4("projection", projection.as_ptr());
-        
-        shader_program.set_used();
         unsafe {
+            gl::BindVertexArray(cube.get_vao());
+            gl::DrawArrays(gl::TRIANGLES, 0, 36);
+        }
 
-            gl::BindVertexArray(model.get_vao());
+        // Draw lamp
+        let mut model = Matrix4::from_translation(light_pos);
+        model = model * Matrix4::from_scale(0.2);
+        lamp_shader.set_used();
+        lamp_shader.set_mat4("view", camera.get_view_matrix().as_ptr());
+        lamp_shader.set_mat4("projection", projection.as_ptr());
+        lamp_shader.set_mat4("model", model.as_ptr());
 
-            for i in 0..10 {
-                let mut model = Matrix4::from_translation(cube_positions[i]);
-                model = model * Matrix4::from_axis_angle(
-                    cgmath::Vector3{x: 1.0, y: 0.3, z: 0.5}.normalize(),
-                    Deg(10.0 * (i+1) as f32 * time)
-                );
-                shader_program.set_mat4("model", model.as_ptr());
-
-                gl::DrawArrays(gl::TRIANGLES, 0, 36);
-            }
-            //gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
-            //gl::DrawArrays(gl::TRIANGLES, 0, 3);
+        unsafe {
+            gl::BindVertexArray(light_vao.get_vao());
+            gl::DrawArrays(gl::TRIANGLES, 0, 36);
         }
 
         window.gl_swap_window();
