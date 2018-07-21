@@ -50,13 +50,9 @@ fn main() {
         include_str!("light.frag")
     ).unwrap();
     let lamp_shader = render_gl::Program::from_shaders(
-        include_str!("triangle.vert"),
+        include_str!("lamp.vert"),
         include_str!("lamp.frag")
     ).unwrap();
-
-    lightning_shader.set_used();
-    lightning_shader.set_vec3("objectColor", 1.0, 0.5, 0.31);
-    lightning_shader.set_vec3("lightColor", 1.0, 1.0, 1.0);
 
     let mut nr_attribs: gl::types::GLint = 0;
     unsafe {
@@ -85,6 +81,12 @@ fn main() {
     let mut last_frame = 0f32;
 
     let mut first_mouse = true;
+
+    
+    lightning_shader.set_used();
+    lightning_shader.set_vec3("objectColor", 1.0, 0.5, 0.31);
+    lightning_shader.set_vec3("lightColor", 1.0, 1.0, 1.0);
+    lightning_shader.set_vec3("lightPos", light_pos.x, light_pos.y, light_pos.z);
 
     println!("Starting main!");
     'main: loop {
