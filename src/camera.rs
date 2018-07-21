@@ -61,6 +61,10 @@ impl Camera {
         self.zoom
     }
 
+    pub fn get_position(&self) -> Vector3<f32> {
+        return self.position;
+    }
+
     pub fn process_keyboard(&mut self, direction: CameraMovement, delta_time: f32) {
             let velocity = self.movement_speed * delta_time;
             self.position += match direction {

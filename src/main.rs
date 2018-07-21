@@ -87,6 +87,7 @@ fn main() {
     lightning_shader.set_vec3("objectColor", 1.0, 0.5, 0.31);
     lightning_shader.set_vec3("lightColor", 1.0, 1.0, 1.0);
     lightning_shader.set_vec3("lightPos", light_pos.x, light_pos.y, light_pos.z);
+    lightning_shader.set_vec3("viewPos", camera.get_position().x, camera.get_position().y, camera.get_position().z);
 
     println!("Starting main!");
     'main: loop {

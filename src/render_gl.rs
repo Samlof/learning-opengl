@@ -135,10 +135,10 @@ impl Shader {
         shader_from_source(source, kind).map(|i| Shader { id: i })
     }
     pub fn from_vert_source(source: &str) -> Result<Shader, String> {
-        Shader::from_source(source, gl::VERTEX_SHADER)
+        Shader::from_source(source, gl::VERTEX_SHADER).map_err(|err| format!("Vertex shader: {}", err))
     }
     pub fn from_frag_source(source: &str) -> Result<Shader, String> {
-        Shader::from_source(source, gl::FRAGMENT_SHADER)
+        Shader::from_source(source, gl::FRAGMENT_SHADER).map_err(|err| format!("Fragment shader: {}", err))
     }
 
     pub fn id(&self) -> gl::types::GLuint {
@@ -182,7 +182,7 @@ fn shader_from_source(source: &str, kind: gl::types::GLuint) -> Result<gl::types
                 error.as_ptr() as *mut gl::types::GLchar,
             );
         }
-        return Err(format!("Shader error: {}", error.to_string_lossy()));
+        return Err(format!("Shader error on: {}", error.to_string_lossy()));
     }
     Ok(id)
 }
