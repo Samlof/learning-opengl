@@ -64,7 +64,7 @@ fn main() {
     let light_vao = model::Model::light();
 
     // Light location
-    let light_pos = Vector3{x: 1.2f32, y: 1.0, z: 2.0};
+    let light_pos = Vector3{x: 0.4f32, y: 0.2, z: 3.0};
 
     // Camera variables
     let camera_pos = Vector3{x: 0.0f32, y: 0.0, z: 3.0};
@@ -84,11 +84,18 @@ fn main() {
 
     
     lightning_shader.set_used();
-    lightning_shader.set_vec3("objectColor", 1.0, 0.5, 0.31);
-    lightning_shader.set_vec3("lightColor", 1.0, 1.0, 1.0);
-    lightning_shader.set_vec3("lightPos", light_pos.x, light_pos.y, light_pos.z);
     lightning_shader.set_vec3("viewPos", camera.get_position().x, camera.get_position().y, camera.get_position().z);
-
+   
+    lightning_shader.set_vec3("material.ambient", 1.0, 0.5, 0.31);
+    lightning_shader.set_vec3("material.diffuse", 1.0, 0.5, 0.31);
+    lightning_shader.set_vec3("material.specular", 0.5, 0.5, 0.5);
+    lightning_shader.set_float("material.shininess", 32.0);
+    
+    lightning_shader.set_vec3("light.position", light_pos.x, light_pos.y, light_pos.z);
+    lightning_shader.set_vec3("light.ambient",  0.2, 0.2, 0.2);
+    lightning_shader.set_vec3("light.diffuse",  0.5, 0.5, 0.5); // darken the light a bit to fit the scene
+    lightning_shader.set_vec3("light.specular", 1.0, 1.0, 1.0); 
+    
     println!("Starting main!");
     'main: loop {
         for event in event_pump.poll_iter() {
@@ -149,6 +156,21 @@ fn main() {
         delta_time = current_frame - last_frame;
         last_frame = current_frame;
 
+        // Move light
+        //light_pos.x = (time * 0.4).sin() * 5.0;
+        lightning_shader.set_vec3("light.position", light_pos.x, light_pos.y, light_pos.z);
+        let light_color = Vector3::new(
+            (time * 2.0).sin(),
+            (time * 0.7).sin(),
+            (time * 1.3).sin()
+        );
+
+        let diffuse_color = light_color * 0.5;
+        let ambient_color = diffuse_color * 0.2;
+
+        lightning_shader.set_vec3("light.ambient", ambient_color.x, ambient_color.y, ambient_color.z);
+        lightning_shader.set_vec3("light.diffuse", diffuse_color.x, diffuse_color.y, diffuse_color.z);
+
         // Projection matrix
         let projection : Matrix4<f32> = cgmath::PerspectiveFov{
             fovy: Deg(camera.get_zoom()).into(),
@@ -162,6 +184,7 @@ fn main() {
         lightning_shader.set_mat4("view", camera.get_view_matrix().as_ptr());
         lightning_shader.set_mat4("projection", projection.as_ptr());
         lightning_shader.set_mat4("model", model.as_ptr());
+        
 
         unsafe {
             gl::BindVertexArray(cube.get_vao());
